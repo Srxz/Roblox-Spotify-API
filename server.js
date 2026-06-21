@@ -77,7 +77,10 @@ app.get("/search", async (req, res) => {
 app.get("/pixel-art", async (req, res) => {
     try {
         const url = req.query.url;
+
         const size = parseInt(req.query.size || "48");
+        const colors = parseInt(req.query.colors || "32");
+        const intensity = parseFloat(req.query.intensity || "1");
 
         if (!url) return res.status(400).send("missing url");
 
@@ -85,7 +88,6 @@ app.get("/pixel-art", async (req, res) => {
             responseType: "arraybuffer"
         });
 
-        // resize + raw pixel data
         const { data, info } = await sharp(img.data)
             .resize(size, size, { fit: "cover" })
             .raw()
@@ -94,16 +96,27 @@ app.get("/pixel-art", async (req, res) => {
         const pixels = [];
 
         for (let i = 0; i < data.length; i += 3) {
-            pixels.push([
-                data[i],
-                data[i + 1],
-                data[i + 2]
-            ]);
+
+            let r = data[i];
+            let g = data[i + 1];
+            let b = data[i + 2];
+
+            // 🎨 intensity boost
+            r = Math.min(255, r * intensity);
+            g = Math.min(255, g * intensity);
+            b = Math.min(255, b * intensity);
+
+            pixels.push([r, g, b]);
         }
 
         res.json({
             size: info.width,
-            pixels
+            pixels,
+            settings: {
+                colors,
+                intensity,
+                cellSize: size
+            }
         });
 
     } catch (err) {
