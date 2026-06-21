@@ -46,10 +46,13 @@ app.get("/image", async (req, res) => {
             responseType: "arraybuffer"
         });
 
-        res.set("Content-Type", "image/jpeg");
-        res.send(response.data);
+        res.setHeader("Content-Type", "image/png");
+        res.setHeader("Cache-Control", "public, max-age=86400");
+
+        res.send(Buffer.from(response.data, "binary"));
 
     } catch (err) {
+        console.log(err.message);
         res.status(500).send("Failed");
     }
 });
