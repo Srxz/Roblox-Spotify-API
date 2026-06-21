@@ -37,7 +37,7 @@ async function getToken() {
     return tokenCache;
 }
 
-app.get("/search-albums", async (req, res) => {
+app.get("/search", async (req, res) => {
     try {
         const q = req.query.q;
         if (!q) return res.status(400).json({ error: "Missing query" });
@@ -51,21 +51,35 @@ app.get("/search-albums", async (req, res) => {
                     Authorization: `Bearer ${token}`,
                 },
                 params: {
-                    q: `album:${q}`,
-                    type: "album",
+                    q: q,
+                    type: "album,artist",
                     limit: 10,
                 },
             }
         );
 
+        // ALBUMS
         const albums = response.data.albums.items.map(a => ({
+            type: "album",
             id: a.id,
             name: a.name,
             artist: a.artists.map(x => x.name).join(", "),
             image: a.images?.[0]?.url,
         }));
 
-        res.json(albums);
+        // ARTISTS
+        const artists = response.data.artists.items.map(a => ({
+            type: "artist",
+            id: a.id,
+            name: a.name,
+            image: a.images?.[0]?.url || null,
+        }));
+
+        res.json({
+            albums,
+            artists,
+        });
+
     } catch (err) {
         console.error(err.response?.data || err.message);
         res.status(500).json({ error: "Spotify request failed" });
