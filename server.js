@@ -37,6 +37,23 @@ async function getToken() {
     return tokenCache;
 }
 
+app.get("/image", async (req, res) => {
+    try {
+        const url = req.query.url;
+        if (!url) return res.status(400).send("No URL");
+
+        const response = await axios.get(url, {
+            responseType: "arraybuffer"
+        });
+
+        res.set("Content-Type", "image/jpeg");
+        res.send(response.data);
+
+    } catch (err) {
+        res.status(500).send("Failed");
+    }
+});
+
 app.get("/search", async (req, res) => {
     try {
         const q = req.query.q;
