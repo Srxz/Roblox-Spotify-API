@@ -2,18 +2,19 @@ import express from "express";
 import axios from "axios";
 import cors from "cors";
 import dotenv from "dotenv";
+import sharp from "sharp";
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
 
+// ---------- Spotify token ----------
 let tokenCache = null;
 let tokenExpire = 0;
 
 async function getToken() {
     const now = Date.now();
-
     if (tokenCache && now < tokenExpire) return tokenCache;
 
     const auth = Buffer.from(
@@ -37,26 +38,7 @@ async function getToken() {
     return tokenCache;
 }
 
-app.get("/image", async (req, res) => {
-    try {
-        const url = req.query.url;
-        if (!url) return res.status(400).send("No URL");
-
-        const response = await axios.get(url, {
-            responseType: "arraybuffer"
-        });
-
-        res.setHeader("Content-Type", "image/png");
-        res.setHeader("Cache-Control", "public, max-age=86400");
-
-        res.send(Buffer.from(response.data, "binary"));
-
-    } catch (err) {
-        console.log(err.message);
-        res.status(500).send("Failed");
-    }
-});
-
+// ---------- SEARCH ----------
 app.get("/search", async (req, res) => {
     try {
         const q = req.query.q;
@@ -67,45 +49,69 @@ app.get("/search", async (req, res) => {
         const response = await axios.get(
             "https://api.spotify.com/v1/search",
             {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
+                headers: { Authorization: `Bearer ${token}` },
                 params: {
-                    q: q,
-                    type: "album,artist",
+                    q,
+                    type: "album",
                     limit: 10,
                 },
             }
         );
 
-        // ALBUMS
         const albums = response.data.albums.items.map(a => ({
-            type: "album",
             id: a.id,
             name: a.name,
             artist: a.artists.map(x => x.name).join(", "),
-            image: a.images?.[0]?.url,
+            image: a.images?.[0]?.url
         }));
 
-        // ARTISTS
-        const artists = response.data.artists.items.map(a => ({
-            type: "artist",
-            id: a.id,
-            name: a.name,
-            image: a.images?.[0]?.url || null,
-        }));
+        res.json(albums);
+    } catch (err) {
+        console.log(err.response?.data || err.message);
+        res.status(500).json({ error: "search failed" });
+    }
+});
+
+
+// ---------- PIXEL ART GENERATOR ----------
+app.get("/pixel-art", async (req, res) => {
+    try {
+        const url = req.query.url;
+        const size = parseInt(req.query.size || "48");
+
+        if (!url) return res.status(400).send("missing url");
+
+        const img = await axios.get(url, {
+            responseType: "arraybuffer"
+        });
+
+        // resize + raw pixel data
+        const { data, info } = await sharp(img.data)
+            .resize(size, size, { fit: "cover" })
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+
+        const pixels = [];
+
+        for (let i = 0; i < data.length; i += 3) {
+            pixels.push([
+                data[i],
+                data[i + 1],
+                data[i + 2]
+            ]);
+        }
 
         res.json({
-            albums,
-            artists,
+            size: info.width,
+            pixels
         });
 
     } catch (err) {
-        console.error(err.response?.data || err.message);
-        res.status(500).json({ error: "Spotify request failed" });
+        console.log(err.message);
+        res.status(500).send("pixel error");
     }
 });
 
 app.listen(process.env.PORT || 3000, () => {
-    console.log("Spotify proxy running");
+    console.log("Spotify pixel server running");
 });
