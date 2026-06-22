@@ -19,18 +19,18 @@ let nsfwModelLoading = null;
 
 async function getNsfwModel() {
     if (nsfwModel) return nsfwModel;
+
     if (!nsfwModelLoading) {
-        nsfwModelLoading = nsfwjs.load().then(model => {
+        nsfwModelLoading = nsfwjs.load(
+            "file://./mobilenet_v2/"
+        ).then(model => {
             nsfwModel = model;
             return model;
         });
     }
+
     return nsfwModelLoading;
 }
-
-getNsfwModel().catch(err =>
-    console.log("nsfw model preload failed:", err.message)
-);
 
 const NSFW_THRESHOLDS = {
     Porn: 0.6,
